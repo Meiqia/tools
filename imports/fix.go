@@ -32,16 +32,42 @@ var (
 	testMu  sync.RWMutex // guards globals reset by tests; used only if inTests
 )
 
-// LocalPrefix, if set, instructs Process to sort import paths with the given
+type stringSliceFlag struct {
+	modified bool
+	values   []string
+}
+
+func (f *stringSliceFlag) Set(v string) error {
+	if !f.modified {
+		f.values = nil
+		f.modified = true
+	}
+	f.values = append(f.values, v)
+	return nil
+}
+
+func (f *stringSliceFlag) String() string {
+	return strings.Join(f.values, ";")
+}
+
+// LocalPrefixes, if set, instructs Process to sort import paths with the given
 // prefix into another group after 3rd-party packages.
-var LocalPrefix string
+var LocalPrefixes = stringSliceFlag{
+	values: []string{
+		"git.meiqia.com/",
+		"github.com/Meiqia/",
+		"github.com/meiqia/",
+	},
+}
 
 // importToGroup is a list of functions which map from an import path to
 // a group number.
 var importToGroup = []func(importPath string) (num int, ok bool){
 	func(importPath string) (num int, ok bool) {
-		if LocalPrefix != "" && strings.HasPrefix(importPath, LocalPrefix) {
-			return 3, true
+		for _, localPrefix := range LocalPrefixes.values {
+			if localPrefix != "" && strings.HasPrefix(importPath, localPrefix) {
+				return 3, true
+			}
 		}
 		return
 	},
