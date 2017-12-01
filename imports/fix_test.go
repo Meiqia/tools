@@ -1397,7 +1397,11 @@ const Y = bar.X
 // Tests that the LocalPrefixes option causes imports
 // to be added into a later group (num=3).
 func TestLocalPrefix(t *testing.T) {
-	defer func(v stringSliceFlag) { LocalPrefixes = v }(LocalPrefixes)
+	defer func(v1, v2 stringSliceFlag) { InHousePrefixes = v1; LocalPrefixes = v2 }(InHousePrefixes, LocalPrefixes)
+	InHousePrefixes = stringSliceFlag{
+		modified: true,
+		values:   []string{"mypkg/"},
+	}
 	LocalPrefixes = stringSliceFlag{
 		modified: true,
 		values:   []string{"foo/"},
@@ -1405,10 +1409,11 @@ func TestLocalPrefix(t *testing.T) {
 
 	testConfig{
 		gopathFiles: map[string]string{
-			"foo/bar/bar.go": "package bar \n const X = 1",
+			"foo/bar/bar.go":       "package bar \n const X = 1",
+			"mypkg/local/local.go": "package local \n const X = 1",
 		},
 	}.test(t, func(t *goimportTest) {
-		buf, err := Process(t.gopath+"/src/test/t.go", []byte("package main \n const Y = bar.X \n const _ = runtime.GOOS"), &Options{})
+		buf, err := Process(t.gopath+"/src/test/t.go", []byte("package main \n const Y = bar.X \n const Y2 = local.X \n const _ = runtime.GOOS"), &Options{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1417,10 +1422,13 @@ func TestLocalPrefix(t *testing.T) {
 import (
 	"runtime"
 
+	"mypkg/local"
+
 	"foo/bar"
 )
 
 const Y = bar.X
+const Y2 = local.X
 const _ = runtime.GOOS
 `
 		if string(buf) != want {
@@ -1432,7 +1440,14 @@ const _ = runtime.GOOS
 // Tests that the multiple prefixes in LocalPrefix option causes imports
 // to be added into a later group (num=3).
 func TestMultipleLocalPrefixes(t *testing.T) {
-	defer func(v stringSliceFlag) { LocalPrefixes = v }(LocalPrefixes)
+	defer func(v1, v2 stringSliceFlag) { InHousePrefixes = v1; LocalPrefixes = v2 }(InHousePrefixes, LocalPrefixes)
+	InHousePrefixes = stringSliceFlag{
+		modified: true,
+		values: []string{
+			"mypkg/",
+			"mypkg2/",
+		},
+	}
 	LocalPrefixes = stringSliceFlag{
 		modified: true,
 		values: []string{
@@ -1443,11 +1458,14 @@ func TestMultipleLocalPrefixes(t *testing.T) {
 
 	testConfig{
 		gopathFiles: map[string]string{
-			"foo/bar/bar.go": "package bar \n const X = 1",
-			"baz/baz.go":     "package baz \n const Z = 1",
+			"mypkg/local/local.go": "package local \n const X = 1",
+			"mypkg2/fooz/fooz.go":  "package fooz \n const Z = 1",
+			"foo/bar/bar.go":       "package bar \n const X = 1",
+			"baz/baz.go":           "package baz \n const Z = 1",
 		},
 	}.test(t, func(t *goimportTest) {
-		buf, err := Process(t.gopath+"/src/test/t.go", []byte("package main \n const Y = bar.X \n const _ = runtime.GOOS\n const Z = baz.Z "), &Options{})
+		buf, err := Process(t.gopath+"/src/test/t.go", []byte(
+			"package main \n const Y1 = local.X \n const Y2 = bar.X \n const _ = runtime.GOOS\n const Z1 = fooz.Z \n const Z2 = baz.Z"), &Options{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1456,13 +1474,18 @@ func TestMultipleLocalPrefixes(t *testing.T) {
 import (
 	"runtime"
 
+	"mypkg/local"
+	"mypkg2/fooz"
+
 	"baz"
 	"foo/bar"
 )
 
-const Y = bar.X
+const Y1 = local.X
+const Y2 = bar.X
 const _ = runtime.GOOS
-const Z = baz.Z
+const Z1 = fooz.Z
+const Z2 = baz.Z
 `
 		if string(buf) != want {
 			t.Errorf("Got:\n%s\nWant:\n%s", buf, want)

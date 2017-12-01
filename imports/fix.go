@@ -33,39 +33,58 @@ var (
 )
 
 type stringSliceFlag struct {
-	modified bool
-	values   []string
+	modified      bool
+	defaultValues []string
+	values        []string
 }
 
 func (f *stringSliceFlag) Set(v string) error {
-	if !f.modified {
-		f.values = nil
-		f.modified = true
-	}
+	f.modified = true
 	f.values = append(f.values, v)
 	return nil
 }
 
 func (f *stringSliceFlag) String() string {
-	return strings.Join(f.values, ";")
+	return strings.Join(f.defaultValues, ";")
 }
 
-// LocalPrefixes, if set, instructs Process to sort import paths with the given
-// prefix into another group after 3rd-party packages.
-var LocalPrefixes = stringSliceFlag{
-	values: []string{
-		"git.meiqia.com/",
-		"github.com/Meiqia/",
-		"github.com/meiqia/",
-	},
+func (f *stringSliceFlag) Values() []string {
+	if f.modified {
+		return f.values
+	}
+	return f.defaultValues
 }
+
+var (
+	// InHousePrefixes, if set, instructs Process to sort import paths with the given
+	// prefix into another group after 3rd-party packages.
+	InHousePrefixes = stringSliceFlag{
+		defaultValues: []string{
+			"git.meiqia.com/",
+			"github.com/Meiqia/",
+			"github.com/meiqia/",
+		},
+	}
+
+	// LocalPrefixes, if set, instructs Process to sort import paths with the given
+	// prefix into another group after in-house packages.
+	LocalPrefixes = stringSliceFlag{}
+)
 
 // importToGroup is a list of functions which map from an import path to
 // a group number.
 var importToGroup = []func(importPath string) (num int, ok bool){
 	func(importPath string) (num int, ok bool) {
-		for _, localPrefix := range LocalPrefixes.values {
-			if localPrefix != "" && strings.HasPrefix(importPath, localPrefix) {
+		for _, prefix := range LocalPrefixes.Values() {
+			if prefix != "" && strings.HasPrefix(importPath, prefix) {
+				return 4, true
+			}
+		}
+		return
+	},
+	func(importPath string) (num int, ok bool) {
+		for _, prefix := range InHousePrefixes.Values() {
+			if prefix != "" && strings.HasPrefix(importPath, prefix) {
 				return 3, true
 			}
 		}

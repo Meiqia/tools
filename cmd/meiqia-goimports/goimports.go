@@ -47,7 +47,8 @@ var (
 
 func init() {
 	flag.BoolVar(&options.AllErrors, "e", false, "report all errors (not just the first 10 on different lines)")
-	flag.Var(&imports.LocalPrefixes, "local", "put imports beginning with this string after 3rd-party packages (can be given multiple times)")
+	flag.Var(&imports.InHousePrefixes, "inhouse", "put imports beginning with this string after 3rd-party packages (can be given multiple times)")
+	flag.Var(&imports.LocalPrefixes, "local", "put imports beginning with this string after in-house packages (can be given multiple times)")
 }
 
 func report(err error) {
